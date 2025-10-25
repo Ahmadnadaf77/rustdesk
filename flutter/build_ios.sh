@@ -3,6 +3,9 @@
 # flutter build ipa --release --obfuscate --split-debug-info=./split-debug-info
 # no obfuscate, because no easy to check errors
 cd $(dirname $(dirname $(which flutter)))
-git apply ~/rustdesk/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
+FLUTTER_VERSION=$(flutter --version | head -n 1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+if dpkg --compare-versions "${FLUTTER_VERSION}" ge "3.24.4"; then
+    git apply ~/rustdesk/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
+fi
 cd -
 flutter build ipa --release

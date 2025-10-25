@@ -34,7 +34,7 @@ env:
   # vcpkg version: 2025.08.27
   # If we change the `VCPKG COMMIT_ID`, please remember:
   # 1. Call `$VCPKG_ROOT/vcpkg x-update-baseline` to update the baseline in `vcpkg.json`.
-  #  Or we may face build issue like 
+  #  Or we may face build issue like
   #  https://github.com/rustdesk/rustdesk/actions/runs/14414119794/job/40427970174
   # 2. Update the `VCPKG_COMMIT_ID` in `ci.yml` and `playground.yml`.
   VCPKG_COMMIT_ID: "120deac3062162151622ca4860575a33844ba10b"
@@ -121,9 +121,9 @@ jobs:
       - name: Patch flutter
         shell: bash
         run: |
-          cp .github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
+          cp .github/patches/flutter_3.24.5_dropdown_menu_enableFilter.diff $(dirname $(dirname $(which flutter)))
           cd $(dirname $(dirname $(which flutter)))
-          [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
+          [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]] && git apply flutter_3.24.5_dropdown_menu_enableFilter.diff
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
@@ -472,7 +472,7 @@ jobs:
       - name: Patch flutter
         run: |
           cd $(dirname $(dirname $(which flutter)))
-          [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]] && git apply ${{ github.workspace }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
+          [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]] && git apply ${{ github.workspace }}/.github/patches/flutter_3.24.5_dropdown_menu_enableFilter.diff
 
       - name: Setup vcpkg with Github Actions binary cache
         uses: lukka/run-vcpkg@v11
@@ -520,7 +520,7 @@ jobs:
         run: |
           rustup target add ${{ matrix.job.target }}
           cargo build --features flutter,hwcodec --release --target aarch64-apple-ios --lib
-          
+
       - name: Upload liblibrustdesk.a Artifacts
         uses: actions/upload-artifact@master
         with:
@@ -550,7 +550,6 @@ jobs:
       #     tag_name: ${{ env.TAG_NAME }}
       #     files: |
       #       flutter/build/ios/ipa/*.ipa
-
 
   build-for-macOS:
     name: ${{ matrix.job.target }}
@@ -640,7 +639,7 @@ jobs:
       - name: Patch flutter
         run: |
           cd $(dirname $(dirname $(which flutter)))
-          [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]] && git apply ${{ github.workspace }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
+          [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]] && git apply ${{ github.workspace }}/.github/patches/flutter_3.24.5_dropdown_menu_enableFilter.diff
 
       - name: Workaround for flutter issue
         shell: bash
@@ -899,7 +898,7 @@ jobs:
       - name: Patch flutter
         run: |
           cd $(dirname $(dirname $(which flutter)))
-          [[ "3.24.5" == ${{env.ANDROID_FLUTTER_VERSION}} ]] && git apply ${{ github.workspace }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
+          [[ "3.24.5" == ${{env.ANDROID_FLUTTER_VERSION}} ]] && git apply ${{ github.workspace }}/.github/patches/flutter_3.24.5_dropdown_menu_enableFilter.diff
 
       - uses: nttld/setup-ndk@v1
         id: setup-ndk
@@ -1169,7 +1168,7 @@ jobs:
       - name: Patch flutter
         run: |
           cd $(dirname $(dirname $(which flutter)))
-          [[ "3.24.5" == ${{env.ANDROID_FLUTTER_VERSION}} ]] && git apply ${{ github.workspace }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
+          [[ "3.24.5" == ${{env.ANDROID_FLUTTER_VERSION}} ]] && git apply ${{ github.workspace }}/.github/patches/flutter_3.24.5_dropdown_menu_enableFilter.diff
 
       - name: Restore bridge files
         uses: actions/download-artifact@master
@@ -1524,7 +1523,7 @@ jobs:
                   pushd /opt/flutter
                 ;;
               esac
-              git apply ${{ github.workspace }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
+              git apply ${{ github.workspace }}/.github/patches/flutter_3.24.5_dropdown_menu_enableFilter.diff
               popd
             fi
 
@@ -2002,7 +2001,7 @@ jobs:
         shell: bash
         run: |
           cd $(dirname $(dirname $(which flutter)))
-          [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]] && git apply ${{ github.workspace }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
+          [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]] && git apply ${{ github.workspace }}/.github/patches/flutter_3.24.5_dropdown_menu_enableFilter.diff
 
       # https://rustdesk.com/docs/en/dev/build/web/
       - name: Build web
