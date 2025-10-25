@@ -13,6 +13,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
@@ -28,13 +30,17 @@ jobs:
           channel: "stable"
 
       - name: Install dependencies
-        run: flutter pub get
+        run: |
+          cd flutter
+          flutter pub get
 
       - name: Build Rust backend
         run: cargo build --release
 
       - name: Build Windows Flutter app
-        run: flutter build windows --release
+        run: |
+          cd flutter
+          flutter build windows --release
 
       - name: Upload Windows build artifacts
         uses: actions/upload-artifact@v4
