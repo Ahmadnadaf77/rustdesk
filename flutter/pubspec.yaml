@@ -19,7 +19,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 version: 1.4.3+61
 
 environment:
-  sdk: '^3.1.0'
+  sdk: "^3.1.0"
 
 dependencies:
   flutter:
@@ -125,14 +125,14 @@ dependency_overrides:
 
 # rerun: flutter pub run flutter_launcher_icons
 flutter_icons:
-  image_path: "../res/icon.png"
+  image_path: "../icon.png"
   remove_alpha_ios: true
   android: true
   ios: true
   windows:
     generate: true
   macos:
-    image_path: "../res/mac-icon.png"
+    image_path: "../icon.png"
     generate: true
   linux: true
   web:
