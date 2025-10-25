@@ -97,3 +97,59 @@ jobs:
           name: build-info
           path: build_info.txt
           retention-days: 30
+
+      - name: Create Windows Installer
+        run: |
+          # Create a simple installer package
+          $buildDir = "flutter/build/windows/x64/runner/Release"
+          $installerDir = "rustdesk-windows-installer"
+          New-Item -ItemType Directory -Path $installerDir
+
+          # Copy all files
+          Copy-Item -Path "$buildDir/*" -Destination $installerDir -Recurse
+
+          # Create a simple batch file to run RustDesk
+          $batchContent = "@echo off`ncd /d `"%~dp0`"`nstart rustdesk.exe"
+          $batchContent | Out-File -FilePath "$installerDir/Start RustDesk.bat" -Encoding ASCII
+
+          # Create a zip file
+          Compress-Archive -Path $installerDir -DestinationPath "rustdesk-windows-${{ github.run_number }}.zip"
+
+      - name: Upload Windows Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustdesk-windows-installer
+          path: rustdesk-windows-${{ github.run_number }}.zip
+          retention-days: 90
+
+      - name: Create GitHub Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          name: RustDesk Windows Release ${{ github.ref_name }}
+          body: |
+            ## RustDesk Windows Release ${{ github.ref_name }}
+
+            ### What's New
+            - Windows desktop application
+            - Remote desktop functionality
+            - File transfer capabilities
+            - Audio/video streaming
+
+            ### Installation
+            1. Download the `rustdesk-windows-installer.zip` file
+            2. Extract the zip file
+            3. Run `Start RustDesk.bat` or double-click `rustdesk.exe`
+
+            ### System Requirements
+            - Windows 10 or later
+            - 64-bit architecture
+
+            ### Build Information
+            - Build Number: ${{ github.run_number }}
+            - Commit: ${{ github.sha }}
+            - Built: ${{ github.event.head_commit.timestamp }}
+          files: |
+            rustdesk-windows-${{ github.run_number }}.zip
+          draft: false
+          prerelease: false
