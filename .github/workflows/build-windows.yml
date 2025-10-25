@@ -39,13 +39,13 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.24.5"
+          flutter-version: "3.27.0"
           channel: "stable"
 
       - name: Patch Flutter
         run: |
           chmod +x ${{ github.workspace }}/.github/scripts/apply-flutter-patch.sh
-          ${{ github.workspace }}/.github/scripts/apply-flutter-patch.sh "3.24.5" ${{ github.workspace }}/.github/patches/flutter_3.24.5_dropdown_menu_enableFilter.diff
+          ${{ github.workspace }}/.github/scripts/apply-flutter-patch.sh "3.27.0" ${{ github.workspace }}/.github/patches/flutter_3.24.5_dropdown_menu_enableFilter.diff
 
       - name: Install dependencies
         run: |
