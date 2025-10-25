@@ -40,6 +40,7 @@ jobs:
           flutter pub get
           flutter pub run build_runner build --delete-conflicting-outputs
           flutter config --enable-windows-desktop
+          flutter doctor
 
       - name: Install Flutter Rust Bridge
         run: |
@@ -47,7 +48,8 @@ jobs:
 
       - name: Generate Flutter Rust Bridge
         run: |
-          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/windows/runner/bridge_generated.h
+          chmod +x ${{ github.workspace }}/.github/scripts/generate-flutter-rust-bridge.sh
+          ${{ github.workspace }}/.github/scripts/generate-flutter-rust-bridge.sh flutter ../src/flutter_ffi.rs ./lib/generated_bridge.dart ./windows/runner/bridge_generated.h
 
       - name: Build Rust backend
         run: cargo build --release
