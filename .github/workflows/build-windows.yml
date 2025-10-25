@@ -34,7 +34,7 @@ jobs:
         run: |
           $env:VCPKG_ROOT = "C:\vcpkg"
           $env:VCPKG_DEFAULT_TRIPLET = "x64-windows-static"
-          C:\vcpkg\vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
+          C:\vcpkg\vcpkg install --triplet x64-windows-static
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
