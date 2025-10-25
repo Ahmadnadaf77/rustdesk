@@ -83,3 +83,5 @@ update-desktop-database ~/.local/share/applications/
 **Installation completed successfully!** 🚀
 
 
+
+
