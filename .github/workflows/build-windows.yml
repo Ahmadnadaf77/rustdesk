@@ -23,6 +23,19 @@ jobs:
           target: x86_64-pc-windows-msvc
           override: true
 
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgDirectory: C:\vcpkg
+          vcpkgGitCommitId: 120deac3062162151622ca4860575a33844ba10b
+          doNotCache: false
+
+      - name: Install vcpkg dependencies
+        run: |
+          $env:VCPKG_ROOT = "C:\vcpkg"
+          $env:VCPKG_DEFAULT_TRIPLET = "x64-windows-static"
+          C:\vcpkg\vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -53,6 +66,9 @@ jobs:
 
       - name: Build Rust backend
         run: cargo build --release
+        env:
+          VCPKG_ROOT: C:\vcpkg
+          VCPKG_DEFAULT_TRIPLET: x64-windows-static
 
       - name: Build Windows Flutter app
         run: |
