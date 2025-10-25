@@ -26,8 +26,21 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.35.6"
+          flutter-version: "3.24.5"
           channel: "stable"
+
+      - name: Patch Flutter
+        run: |
+          chmod +x ${{ github.workspace }}/.github/scripts/apply-flutter-patch.sh
+          ${{ github.workspace }}/.github/scripts/apply-flutter-patch.sh "3.24.5" ${{ github.workspace }}/.github/patches/flutter_3.24.5_dropdown_menu_enableFilter.diff
+
+      - name: Install Flutter Rust Bridge
+        run: |
+          cargo install flutter_rust_bridge_codegen --version 1.80.1 --features "uuid" --locked
+
+      - name: Generate Flutter Rust Bridge
+        run: |
+          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/windows/runner/bridge_generated.h
 
       - name: Install dependencies
         run: |
