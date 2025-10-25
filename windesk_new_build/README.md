@@ -60,3 +60,5 @@ If you encounter issues:
 1. Ensure all required system libraries are installed
 2. Check that the executable has proper permissions
 3. Verify that the Rust backend components are available if full functionality is needed
+
+

@@ -17,3 +17,5 @@ update-desktop-database ~/.local/share/applications/ 2>/dev/null || true
 
 echo "WinDesk has been installed!"
 echo "You can now find it in your applications menu or run it with: ./windesk"
+
+
