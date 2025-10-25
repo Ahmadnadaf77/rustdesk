@@ -1,0 +1,29 @@
+# Dockerfile for Windows build (requires Windows containers)
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+
+# Install Chocolatey
+RUN powershell -Command \
+    Set-ExecutionPolicy Bypass -Scope Process -Force; \
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
+    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
+# Install build tools
+RUN choco install -y git rust visualstudio2022buildtools cmake ninja
+
+# Install Flutter
+RUN choco install -y flutter
+
+# Set environment variables
+ENV PATH="C:\Program Files\Rust stable MSVC 1.70\bin;C:\flutter\bin;C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin;%PATH%"
+
+# Copy source code
+COPY . C:\rustdesk
+WORKDIR C:\rustdesk
+
+# Build commands
+RUN cd flutter && flutter pub get
+RUN cd flutter && flutter build windows --release
+
+# Output directory
+VOLUME ["C:\\output"]
+CMD ["powershell", "-Command", "Copy-Item -Path 'flutter\\build\\windows\\x64\\runner\\Release\\*' -Destination 'C:\\output\\' -Recurse"]

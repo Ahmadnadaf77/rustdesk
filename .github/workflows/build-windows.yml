@@ -1,0 +1,60 @@
+name: Build Windows Release
+
+on:
+    push:
+        branches: [master, main]
+    pull_request:
+        branches: [master, main]
+    workflow_dispatch:
+
+jobs:
+    build-windows:
+        runs-on: windows-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Rust
+              uses: actions-rs/toolchain@v1
+              with:
+                  toolchain: stable
+                  target: x86_64-pc-windows-msvc
+                  override: true
+
+            - name: Setup Flutter
+              uses: subosito/flutter-action@v2
+              with:
+                  flutter-version: "3.35.6"
+                  channel: "stable"
+
+            - name: Install dependencies
+              run: flutter pub get
+
+            - name: Build Rust backend
+              run: cargo build --release
+
+            - name: Build Windows Flutter app
+              run: flutter build windows --release
+
+            - name: Upload Windows build artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: rustdesk-windows-build
+                  path: flutter/build/windows/x64/runner/Release/
+                  retention-days: 30
+
+            - name: Create build info
+              run: |
+                  echo "Build completed at: $(date)" > build_info.txt
+                  echo "Custom Server Configuration:" >> build_info.txt
+                  echo "ID Server: 171.22.24.28:21116" >> build_info.txt
+                  echo "API Server: https://171.22.24.28" >> build_info.txt
+                  echo "Public Key: 8HKCcJSQXbsgojo0gjrTg8uh7Kzfz+NS35lgIbWb0Vw=" >> build_info.txt
+                  echo "Build Version: 1.4.3+61" >> build_info.txt
+
+            - name: Upload build info
+              uses: actions/upload-artifact@v4
+              with:
+                  name: build-info
+                  path: build_info.txt
+                  retention-days: 30
