@@ -5,6 +5,7 @@
 .DS_Store
 libsciter-gtk.so
 src/ui/inline.rs
+vcpkg/
 extractor
 __pycache__
 src/version.rs
