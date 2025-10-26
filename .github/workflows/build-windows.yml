@@ -82,7 +82,7 @@ jobs:
           C:\vcpkg\vcpkg remove opus:x64-windows-static --triplet x64-windows-static --recurse
           # Force install opus specifically to ensure it's available with correct CRT linkage
           Write-Host "Installing opus with static linkage..."
-          C:\vcpkg\vcpkg install opus:x64-windows-static --triplet x64-windows-static --clean-after-build --verbose
+          C:\vcpkg\vcpkg install opus:x64-windows-static --triplet x64-windows-static --clean-after-build
           # Install all other dependencies
           Write-Host "Installing all other dependencies..."
           C:\vcpkg\vcpkg install --triplet x64-windows-static --clean-after-build
