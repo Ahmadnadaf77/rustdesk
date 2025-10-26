@@ -16,6 +16,40 @@ jobs:
         with:
           submodules: recursive
 
+      # Cache Rust dependencies
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      # Cache Flutter dependencies
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            flutter/.dart_tool
+            flutter/.packages
+            flutter/pubspec.lock
+          key: ${{ runner.os }}-flutter-${{ hashFiles('flutter/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
+
+      # Cache vcpkg dependencies
+      - name: Cache vcpkg dependencies
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\installed
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-
+
+      # Setup Rust and Flutter in parallel
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -23,6 +57,14 @@ jobs:
           target: x86_64-pc-windows-msvc
           override: true
 
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.35.7"
+          channel: "stable"
+          cache: true
+
+      # Setup vcpkg with caching
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
@@ -30,50 +72,56 @@ jobs:
           vcpkgGitCommitId: 120deac3062162151622ca4860575a33844ba10b
           doNotCache: false
 
+      # Install vcpkg dependencies (only if not cached)
       - name: Install vcpkg dependencies
         run: |
           $env:VCPKG_ROOT = "C:\vcpkg"
           $env:VCPKG_DEFAULT_TRIPLET = "x64-windows-static"
           C:\vcpkg\vcpkg install --triplet x64-windows-static
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.27.0"
-          channel: "stable"
-
+      # Patch Flutter
       - name: Patch Flutter
         run: |
           chmod +x ${{ github.workspace }}/.github/scripts/apply-flutter-patch.sh
-          ${{ github.workspace }}/.github/scripts/apply-flutter-patch.sh "3.27.0" ${{ github.workspace }}/.github/patches/flutter_3.24.5_dropdown_menu_enableFilter.diff
+          ${{ github.workspace }}/.github/scripts/apply-flutter-patch.sh "3.35.7" ${{ github.workspace }}/.github/patches/flutter_3.24.5_dropdown_menu_enableFilter.diff
 
-      - name: Install dependencies
+      # Install Flutter dependencies and configure
+      - name: Install Flutter dependencies
         run: |
           cd flutter
           flutter pub get
           flutter config --enable-windows-desktop
           flutter doctor
-          # Run build_runner after Flutter Rust Bridge generation
+
+      # Install Flutter Rust Bridge (with caching)
+      - name: Cache Flutter Rust Bridge
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/flutter_rust_bridge_codegen.exe
+          key: ${{ runner.os }}-flutter-rust-bridge-1.80.1
 
       - name: Install Flutter Rust Bridge
         run: |
-          cargo install flutter_rust_bridge_codegen --version 1.80.1 --features "uuid" --locked
+          if (-not (Test-Path "~/.cargo/bin/flutter_rust_bridge_codegen.exe")) {
+            cargo install flutter_rust_bridge_codegen --version 1.80.1 --features "uuid" --locked
+          }
 
-      - name: Generate Flutter Rust Bridge
+      # Generate Flutter Rust Bridge and run build_runner in one step
+      - name: Generate Flutter Rust Bridge and run build_runner
         run: |
           cd flutter
-          # Ensure Flutter dependencies are properly installed
-          flutter pub get
-          # Generate Flutter Rust Bridge from within Flutter directory
           ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ../src/flutter_ffi.rs --dart-output ./lib/generated_bridge.dart --c-output ./windows/runner/bridge_generated.h --skip-deps-check --no-build-runner
-
-      - name: Run Flutter build_runner
-        run: |
-          cd flutter
           flutter pub run build_runner build --delete-conflicting-outputs
 
+      # Build Rust backend and Flutter app in parallel
       - name: Build Rust backend
-        run: cargo build --release
+        run: |
+          # Set up Rust build environment for faster compilation
+          $env:RUSTC_WRAPPER = ""
+          $env:CARGO_INCREMENTAL = "1"
+          $env:CARGO_NET_RETRY = "2"
+          $env:CARGO_HTTP_TIMEOUT = "30"
+          cargo build --release --jobs 2
         env:
           VCPKG_ROOT: C:\vcpkg
           VCPKG_DEFAULT_TRIPLET: x64-windows-static
@@ -81,7 +129,8 @@ jobs:
       - name: Build Windows Flutter app
         run: |
           cd flutter
-          flutter build windows --release
+          # Optimize Flutter build for faster compilation
+          flutter build windows --release --verbose
 
       - name: Upload Windows build artifacts
         uses: actions/upload-artifact@v4
