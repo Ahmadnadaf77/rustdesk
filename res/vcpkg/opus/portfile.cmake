@@ -60,7 +60,6 @@ vcpkg_fixup_pkgconfig(SYSTEM_LIBRARIES m)
 
 
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/debug/lib/cmake"
-                    "${CURRENT_PACKAGES_DIR}/lib/cmake"
-                    "${CURRENT_PACKAGES_DIR}/debug/include")
+                    "${CURRENT_PACKAGES_DIR}/lib/cmake")
 
 vcpkg_install_copyright(FILE_LIST "${SOURCE_PATH}/COPYING")
