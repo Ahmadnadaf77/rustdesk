@@ -185,27 +185,30 @@ jobs:
 
           # Install dependencies using manifest mode
           Write-Host "Installing vcpkg dependencies in manifest mode..."
-          Write-Host "Command: vcpkg install --triplet x64-windows-static --x-manifest-root=`"$manifestDir`" --x-install-root=`"C:\vcpkg\installed`""
+          Write-Host "Command: vcpkg install --triplet x64-windows-static --x-manifest-root=$manifestDir --x-install-root=C:\vcpkg\installed"
           Write-Host ""
 
           # Change to workspace directory to ensure relative paths work
           cd $workspaceDir
 
           # Run vcpkg install in manifest mode with explicit paths
+          # Note: PowerShell will automatically quote paths with spaces when using call operator
           $vcpkgArgs = @(
-            "install",
-            "--triplet", "x64-windows-static",
-            "--x-manifest-root=`"$manifestDir`"",
-            "--x-install-root=`"C:\vcpkg\installed`"",
-            "--x-packages-root=`"C:\vcpkg\packages`"",
-            "--overlay-ports=`"$overlayPortsDir`"",
+            "install"
+            "--triplet"
+            "x64-windows-static"
+            "--x-manifest-root=$manifestDir"
+            "--x-install-root=C:\vcpkg\installed"
+            "--x-packages-root=C:\vcpkg\packages"
+            "--overlay-ports=$overlayPortsDir"
             "--clean-after-build"
           )
 
-          Write-Host "Executing: C:\vcpkg\vcpkg $($vcpkgArgs -join ' ')"
+          Write-Host "Executing vcpkg with arguments:"
+          $vcpkgArgs | ForEach-Object { Write-Host "  $_" }
           Write-Host ""
 
-          & C:\vcpkg\vcpkg @vcpkgArgs 2>&1 | Tee-Object -Variable vcpkgOutput
+          & C:\vcpkg\vcpkg $vcpkgArgs 2>&1 | Tee-Object -Variable vcpkgOutput
           $vcpkgExitCode = $LASTEXITCODE
 
           Write-Host ""
