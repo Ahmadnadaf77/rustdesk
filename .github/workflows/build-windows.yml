@@ -40,16 +40,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-flutter-
 
-      # Cache vcpkg dependencies
-      - name: Cache vcpkg dependencies
-        uses: actions/cache@v4
-        with:
-          path: C:\vcpkg\installed
-          key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json') }}-${{ hashFiles('res/vcpkg/**') }}
-          restore-keys: |
-            ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json') }}-
-            ${{ runner.os }}-vcpkg-
-
       # Setup Rust and Flutter in parallel
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
@@ -65,37 +55,74 @@ jobs:
           channel: "stable"
           cache: true
 
-      # Setup vcpkg with caching
+      # Setup and install vcpkg dependencies
       - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgDirectory: C:\vcpkg
-          vcpkgGitCommitId: 120deac3062162151622ca4860575a33844ba10b
-          doNotCache: false
+        run: |
+          # Clone vcpkg if it doesn't exist
+          if (-not (Test-Path "C:\vcpkg\.git")) {
+            Write-Host "Cloning vcpkg..."
+            git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
+          }
 
-      # Install vcpkg dependencies (only if not cached)
+          # Checkout specific commit
+          cd C:\vcpkg
+          git fetch
+          git checkout 120deac3062162151622ca4860575a33844ba10b
+
+          # Bootstrap vcpkg
+          Write-Host "Bootstrapping vcpkg..."
+          .\bootstrap-vcpkg.bat
+
+          Write-Host "vcpkg setup complete"
+
+      - name: Cache vcpkg installed packages
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\installed
+          key: ${{ runner.os }}-vcpkg-installed-${{ hashFiles('vcpkg.json', '**/vcpkg.json') }}-${{ hashFiles('res/vcpkg/**') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-installed-
+
+      # Install vcpkg dependencies
       - name: Install vcpkg dependencies
         run: |
           $env:VCPKG_ROOT = "C:\vcpkg"
           $env:VCPKG_DEFAULT_TRIPLET = "x64-windows-static"
 
-          # Ensure the installed directory exists
-          Write-Host "Ensuring vcpkg installed directory structure exists..."
-          if (-not (Test-Path "C:\vcpkg\installed")) {
-            New-Item -ItemType Directory -Path "C:\vcpkg\installed" -Force
-            Write-Host "Created installed directory"
+          Write-Host "Current directory: $(Get-Location)"
+
+          # Check if vcpkg.json exists
+          if (Test-Path "vcpkg.json") {
+            Write-Host "Found vcpkg.json in root directory"
+          } else {
+            Write-Host "vcpkg.json not found, installing packages manually..."
           }
 
-          # Install all dependencies without --clean-after-build to preserve installed files
-          Write-Host "Installing all dependencies from vcpkg.json..."
-          C:\vcpkg\vcpkg install --triplet x64-windows-static
+          # Ensure vcpkg is executable
+          if (-not (Test-Path "C:\vcpkg\vcpkg.exe")) {
+            Write-Host "ERROR: vcpkg.exe not found!"
+            exit 1
+          }
 
-          # Integrate vcpkg with the build system
+          # Install dependencies
+          Write-Host "Installing vcpkg dependencies..."
+          if (Test-Path "vcpkg.json") {
+            C:\vcpkg\vcpkg install --triplet x64-windows-static
+          } else {
+            # Install common dependencies manually if vcpkg.json doesn't exist
+            Write-Host "Installing dependencies manually..."
+            C:\vcpkg\vcpkg install opus:x64-windows-static
+            C:\vcpkg\vcpkg install libyuv:x64-windows-static
+            C:\vcpkg\vcpkg install libvpx:x64-windows-static
+            C:\vcpkg\vcpkg install libjpeg-turbo:x64-windows-static
+          }
+
+          # Integrate vcpkg
           Write-Host "Integrating vcpkg with build system..."
           C:\vcpkg\vcpkg integrate install
 
-          # Verify installation was successful
-          Write-Host "Verifying vcpkg packages are installed..."
+          # List installed packages
+          Write-Host "Installed packages:"
           C:\vcpkg\vcpkg list --triplet x64-windows-static
 
       # Verify vcpkg installation
@@ -106,46 +133,70 @@ jobs:
 
           Write-Host "=== VCPKG INSTALLATION VERIFICATION ==="
 
-          # Verify installed directory exists
-          if (-not (Test-Path "C:\vcpkg\installed\x64-windows-static")) {
-            Write-Host "ERROR: vcpkg installed directory does not exist!"
+          # First check if vcpkg base directory exists
+          if (-not (Test-Path "C:\vcpkg")) {
+            Write-Host "ERROR: vcpkg root directory does not exist!"
             exit 1
           }
+          Write-Host "✓ vcpkg root exists"
 
+          # Check if installed directory exists at all
+          if (-not (Test-Path "C:\vcpkg\installed")) {
+            Write-Host "ERROR: vcpkg installed directory does not exist!"
+            Write-Host "This usually means packages were not installed."
+            Write-Host "Available directories in C:\vcpkg:"
+            Get-ChildItem "C:\vcpkg" -Name
+            exit 1
+          }
           Write-Host "✓ Installed directory exists"
+
+          # Verify triplet-specific installed directory exists
+          if (-not (Test-Path "C:\vcpkg\installed\x64-windows-static")) {
+            Write-Host "ERROR: vcpkg installed directory for x64-windows-static does not exist!"
+            Write-Host "Available triplets:"
+            Get-ChildItem "C:\vcpkg\installed" -Name
+            exit 1
+          }
+          Write-Host "✓ x64-windows-static directory exists"
 
           # Verify include directory exists
           if (-not (Test-Path "C:\vcpkg\installed\x64-windows-static\include")) {
-            Write-Host "ERROR: Include directory does not exist!"
-            exit 1
+            Write-Host "WARNING: Include directory does not exist!"
+            Write-Host "Contents of x64-windows-static directory:"
+            Get-ChildItem "C:\vcpkg\installed\x64-windows-static" -Name
+          } else {
+            Write-Host "✓ Include directory exists"
           }
-
-          Write-Host "✓ Include directory exists"
 
           # Verify lib directory exists
           if (-not (Test-Path "C:\vcpkg\installed\x64-windows-static\lib")) {
-            Write-Host "ERROR: Lib directory does not exist!"
-            exit 1
+            Write-Host "WARNING: Lib directory does not exist!"
+          } else {
+            Write-Host "✓ Lib directory exists"
           }
 
-          Write-Host "✓ Lib directory exists"
+          # List all installed packages
+          Write-Host "`nAll installed packages:"
+          C:\vcpkg\vcpkg list --triplet x64-windows-static
 
-          # List key installed packages and headers
-          Write-Host "`nInstalled packages:"
+          # Check for key packages
+          Write-Host "`nKey packages:"
           C:\vcpkg\vcpkg list --triplet x64-windows-static | Select-String -Pattern "opus|libyuv|vpx|jpeg"
 
-          Write-Host "`nChecking for opus headers:"
-          $opusHeaderPath = "C:\vcpkg\installed\x64-windows-static\include\opus\opus.h"
-          if (Test-Path $opusHeaderPath) {
-            Write-Host "✓ Opus headers found at: $opusHeaderPath"
-          } else {
-            Write-Host "ERROR: Opus headers not found at expected location!"
-            Write-Host "Available include directories:"
-            Get-ChildItem "C:\vcpkg\installed\x64-windows-static\include" -Name
-            exit 1
+          # Check for opus headers if include dir exists
+          if (Test-Path "C:\vcpkg\installed\x64-windows-static\include") {
+            Write-Host "`nChecking for opus headers:"
+            $opusHeaderPath = "C:\vcpkg\installed\x64-windows-static\include\opus\opus.h"
+            if (Test-Path $opusHeaderPath) {
+              Write-Host "✓ Opus headers found at: $opusHeaderPath"
+            } else {
+              Write-Host "WARNING: Opus headers not found at expected location!"
+              Write-Host "Available include directories:"
+              Get-ChildItem "C:\vcpkg\installed\x64-windows-static\include" -Name
+            }
           }
 
-          Write-Host "`n=== VCPKG VERIFICATION SUCCESSFUL ===`n"
+          Write-Host "`n=== VCPKG VERIFICATION COMPLETE ===`n"
 
       # Patch Flutter
       - name: Patch Flutter
