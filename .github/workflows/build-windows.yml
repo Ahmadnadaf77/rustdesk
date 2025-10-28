@@ -73,9 +73,15 @@ jobs:
           Write-Host "Bootstrapping vcpkg..."
           .\bootstrap-vcpkg.bat
 
+          if (-not $?) {
+            Write-Host "ERROR: vcpkg bootstrap failed!"
+            exit 1
+          }
+
           Write-Host "vcpkg setup complete"
 
       - name: Cache vcpkg installed packages
+        id: cache-vcpkg
         uses: actions/cache@v4
         with:
           path: C:\vcpkg\installed
@@ -86,16 +92,33 @@ jobs:
       # Install vcpkg dependencies
       - name: Install vcpkg dependencies
         run: |
+          $ErrorActionPreference = "Continue"  # Don't stop on errors, we'll check manually
           $env:VCPKG_ROOT = "C:\vcpkg"
           $env:VCPKG_DEFAULT_TRIPLET = "x64-windows-static"
 
+          Write-Host "=== VCPKG INSTALLATION START ==="
           Write-Host "Current directory: $(Get-Location)"
+          Write-Host "Cache hit: ${{ steps.cache-vcpkg.outputs.cache-hit }}"
+          Write-Host ""
 
           # Check if vcpkg.json exists
           if (Test-Path "vcpkg.json") {
-            Write-Host "Found vcpkg.json in root directory"
+            Write-Host "✓ Found vcpkg.json in root directory"
+            Write-Host ""
           } else {
-            Write-Host "vcpkg.json not found, installing packages manually..."
+            Write-Host "✗ vcpkg.json not found!"
+            Write-Host "Files in current directory:"
+            Get-ChildItem -Name
+            Write-Host ""
+            Write-Host "Will install packages manually..."
+          }
+
+          # Check overlay ports directory
+          if (Test-Path "res/vcpkg") {
+            Write-Host "✓ Found overlay ports directory: res/vcpkg"
+            Write-Host "Overlay ports available:"
+            Get-ChildItem "res/vcpkg" -Name
+            Write-Host ""
           }
 
           # Ensure vcpkg is executable
@@ -103,27 +126,74 @@ jobs:
             Write-Host "ERROR: vcpkg.exe not found!"
             exit 1
           }
+          Write-Host "✓ vcpkg.exe found at C:\vcpkg\vcpkg.exe"
+          Write-Host ""
+
+          # Check if packages are already installed (from cache)
+          if (Test-Path "C:\vcpkg\installed\x64-windows-static") {
+            Write-Host "Packages appear to be cached, checking if complete..."
+            $installedPackages = C:\vcpkg\vcpkg list --triplet x64-windows-static
+            $packageCount = ($installedPackages | Measure-Object -Line).Lines
+            Write-Host "Found $packageCount cached packages:"
+            Write-Host $installedPackages
+            Write-Host ""
+            
+            if ($packageCount -gt 0) {
+              Write-Host "Cache is valid, skipping installation"
+              C:\vcpkg\vcpkg integrate install
+              Write-Host "=== VCPKG INSTALLATION COMPLETE (FROM CACHE) ==="
+              exit 0
+            }
+          } else {
+            Write-Host "No cached packages found, will install fresh"
+            Write-Host ""
+          }
 
           # Install dependencies
           Write-Host "Installing vcpkg dependencies..."
-          if (Test-Path "vcpkg.json") {
-            C:\vcpkg\vcpkg install --triplet x64-windows-static
-          } else {
-            # Install common dependencies manually if vcpkg.json doesn't exist
-            Write-Host "Installing dependencies manually..."
-            C:\vcpkg\vcpkg install opus:x64-windows-static
-            C:\vcpkg\vcpkg install libyuv:x64-windows-static
-            C:\vcpkg\vcpkg install libvpx:x64-windows-static
-            C:\vcpkg\vcpkg install libjpeg-turbo:x64-windows-static
+          Write-Host "Command: C:\vcpkg\vcpkg install --triplet x64-windows-static --debug"
+          Write-Host ""
+
+          # Run vcpkg install with full output
+          C:\vcpkg\vcpkg install --triplet x64-windows-static --debug 2>&1 | Tee-Object -Variable vcpkgOutput | Write-Host
+          $vcpkgExitCode = $LASTEXITCODE
+
+          Write-Host ""
+          Write-Host "vcpkg install exit code: $vcpkgExitCode"
+          Write-Host ""
+
+          # Check if installation succeeded
+          if ($vcpkgExitCode -ne 0) {
+            Write-Host "ERROR: vcpkg install failed with exit code $vcpkgExitCode"
+            Write-Host ""
+            Write-Host "Checking what was created in vcpkg directory:"
+            Get-ChildItem "C:\vcpkg" -Name
+            Write-Host ""
+            exit 1
           }
+
+          # Verify installed directory was created
+          if (-not (Test-Path "C:\vcpkg\installed")) {
+            Write-Host "ERROR: installed directory was not created after installation!"
+            Write-Host ""
+            Write-Host "Contents of C:\vcpkg:"
+            Get-ChildItem "C:\vcpkg" -Name
+            Write-Host ""
+            exit 1
+          }
+          Write-Host "✓ Installed directory created successfully"
+          Write-Host ""
 
           # Integrate vcpkg
           Write-Host "Integrating vcpkg with build system..."
           C:\vcpkg\vcpkg integrate install
+          Write-Host ""
 
           # List installed packages
           Write-Host "Installed packages:"
           C:\vcpkg\vcpkg list --triplet x64-windows-static
+          Write-Host ""
+          Write-Host "=== VCPKG INSTALLATION COMPLETE ==="
 
       # Verify vcpkg installation
       - name: Verify vcpkg installation
