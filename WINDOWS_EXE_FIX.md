@@ -1,5 +1,7 @@
 # Why rustdesk.exe Doesn't Show Anything on Windows
 
+## ⚠️ IMPORTANT: Single .exe File Will NOT Work!
+
 ## The Problem
 
 The `rustdesk.exe` file alone **cannot run** because:
@@ -7,6 +9,7 @@ The `rustdesk.exe` file alone **cannot run** because:
 1. **RustDesk uses Flutter** for the UI
 2. The .exe needs Flutter runtime DLLs and data files
 3. When built with `windows_subsystem = "windows"`, errors are silent
+4. **All required files MUST be in the same directory**
 
 ## Quick Fix: Download Official Build
 
@@ -119,10 +122,14 @@ See `build.py` for the full build script.
 
 ❌ **Won't work:** Single `rustdesk.exe` file
 ✅ **Will work:** Entire `flutter\build\windows\x64\runner\Release\` folder
-✅ **Best option:** Download official release from GitHub
+✅ **Best option:** Use GitHub Actions workflow (automated build)
+✅ **Alternative:** Download official release from GitHub (uses default servers)
 
 ## Need More Help?
 
-1. Check the official docs: https://rustdesk.com/docs
-2. GitHub issues: https://github.com/rustdesk/rustdesk/issues
-3. Build from scratch: See BUILD_WINDOWS_GUIDE.md
+1. **QUICK START:** See `QUICK_FIX_WINDOWS.md` for step-by-step solutions
+2. **Check your build:** Run `./create_windows_package.sh` script
+3. **Automated build:** Use `.github/workflows/build-windows.yml`
+4. Check the official docs: https://rustdesk.com/docs
+5. GitHub issues: https://github.com/rustdesk/rustdesk/issues
+6. Build from scratch: See BUILD_WINDOWS_GUIDE.md
