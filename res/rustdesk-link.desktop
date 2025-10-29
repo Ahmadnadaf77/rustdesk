@@ -1,11 +1,11 @@
 [Desktop Entry]
-Name=WinDesk
+Name=RustDesk
 NoDisplay=true
-MimeType=x-scheme-handler/windesk;
-TryExec=windesk
-Exec=windesk %u
-Icon=windesk
+MimeType=x-scheme-handler/rustdesk;
+TryExec=rustdesk
+Exec=rustdesk %u
+Icon=rustdesk
 Terminal=false
 Type=Application
 StartupNotify=false
-StartupWMClass=windesk
+StartupWMClass=rustdesk

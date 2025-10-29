@@ -1,17 +1,17 @@
 [Unit]
-Description=WinDesk
+Description=RustDesk
 Requires=network.target
 After=systemd-user-sessions.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/windesk --service
+ExecStart=/usr/bin/rustdesk --service
 # kill --tray and --server both
-ExecStop=pkill -f "windesk --"
+ExecStop=pkill -f "rustdesk --"
 # below two lines do not work, have to use above one line
-#ExecStop=pkill -f "windesk --tray"
-#ExecStop=pkill -f "windesk --server"
-PIDFile=/run/windesk.pid
+#ExecStop=pkill -f "rustdesk --tray"
+#ExecStop=pkill -f "rustdesk --server"
+PIDFile=/run/rustdesk.pid
 KillMode=mixed
 TimeoutStopSec=30
 User=root

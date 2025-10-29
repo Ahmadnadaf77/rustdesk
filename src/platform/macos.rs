@@ -38,7 +38,7 @@ static PRIVILEGES_SCRIPTS_DIR: Dir =
     include_dir!("$CARGO_MANIFEST_DIR/src/platform/privileges_scripts");
 static mut LATEST_SEED: i32 = 0;
 
-const UPDATE_TEMP_DIR: &str = "/tmp/.windeskupdate";
+const UPDATE_TEMP_DIR: &str = "/tmp/.rustdeskupdate";
 
 extern "C" {
     fn CGSCurrentCursorSeed() -> i32;

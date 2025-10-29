@@ -51,7 +51,7 @@ pub enum GrabState {
 pub type NotifyMessageBox = fn(String, String, String, String) -> dyn Future<Output = ()>;
 
 // the executable name of the portable version
-pub const PORTABLE_APPNAME_RUNTIME_ENV_KEY: &str = "WINDESK_APPNAME";
+pub const PORTABLE_APPNAME_RUNTIME_ENV_KEY: &str = "RUSTDESK_APPNAME";
 
 pub const PLATFORM_WINDOWS: &str = "Windows";
 pub const PLATFORM_LINUX: &str = "Linux";
@@ -945,8 +945,8 @@ pub fn get_app_name() -> String {
 }
 
 #[inline]
-pub fn is_windesk() -> bool {
-    hbb_common::config::APP_NAME.read().unwrap().eq("WinDesk")
+pub fn is_rustdesk() -> bool {
+    hbb_common::config::APP_NAME.read().unwrap().eq("RustDesk")
 }
 
 #[inline]
@@ -1532,10 +1532,10 @@ impl ThrottledInterval {
     }
 }
 
-pub type WinDeskInterval = ThrottledInterval;
+pub type RustDeskInterval = ThrottledInterval;
 
 #[inline]
-pub fn windesk_interval(i: Interval) -> ThrottledInterval {
+pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
     ThrottledInterval::new(i)
 }
 
