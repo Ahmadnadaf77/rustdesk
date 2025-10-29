@@ -164,22 +164,70 @@ jobs:
           if (Test-Path $installedDir) {
             Write-Host "Checking cached packages..."
             try {
-              $installedPackages = & C:\vcpkg\vcpkg list --triplet x64-windows-static 2>&1
-              $packageCount = ($installedPackages | Measure-Object -Line).Lines
+              # Check if critical directories and files exist
+              $criticalPaths = @(
+                "$installedDir\include",
+                "$installedDir\lib",
+                "$installedDir\include\opus\opus.h",
+                "$installedDir\lib\opus.lib"
+              )
               
-              if ($packageCount -gt 5) {
-                Write-Host "Found $packageCount cached packages - cache is valid"
-                Write-Host "Integrating cached vcpkg..."
-                & C:\vcpkg\vcpkg integrate install
-                Write-Host "=== VCPKG INSTALLATION COMPLETE (FROM CACHE) ==="
-                exit 0
-              } else {
-                Write-Host "Cache appears incomplete ($packageCount packages), reinstalling..."
-                Remove-Item -Recurse -Force $installedDir -ErrorAction SilentlyContinue
+              $allPathsExist = $true
+              foreach ($path in $criticalPaths) {
+                if (-not (Test-Path $path)) {
+                  Write-Host "Missing critical path: $path"
+                  $allPathsExist = $false
+                  break
+                }
+              }
+              
+              if ($allPathsExist) {
+                $installedPackages = & C:\vcpkg\vcpkg list --triplet x64-windows-static 2>&1
+                $packageCount = ($installedPackages | Measure-Object -Line).Lines
+                
+                if ($packageCount -gt 5) {
+                  Write-Host "Found $packageCount cached packages with all critical files - cache is valid"
+                  Write-Host "Integrating cached vcpkg..."
+                  & C:\vcpkg\vcpkg integrate install
+                  Write-Host "=== VCPKG INSTALLATION COMPLETE (FROM CACHE) ==="
+                  exit 0
+                }
+              }
+              
+              Write-Host "Cache appears incomplete or corrupted, cleaning and reinstalling..."
+              Remove-Item -Recurse -Force $installedDir -ErrorAction SilentlyContinue
+              # Also clear packages directory to reset vcpkg state
+              if (Test-Path "C:\vcpkg\packages") {
+                Remove-Item -Recurse -Force "C:\vcpkg\packages" -ErrorAction SilentlyContinue
+              }
+              # Clear vcpkg status files to reset internal registry
+              $vcpkgStatusFiles = @(
+                "C:\vcpkg\installed\vcpkg",
+                "C:\vcpkg\.vcpkg-root"
+              )
+              foreach ($statusFile in $vcpkgStatusFiles) {
+                if (Test-Path $statusFile) {
+                  Remove-Item -Recurse -Force $statusFile -ErrorAction SilentlyContinue
+                }
               }
             } catch {
               Write-Host "Error checking cache: $_"
               Write-Host "Will reinstall packages"
+              Remove-Item -Recurse -Force $installedDir -ErrorAction SilentlyContinue
+              # Also clear packages directory to reset vcpkg state
+              if (Test-Path "C:\vcpkg\packages") {
+                Remove-Item -Recurse -Force "C:\vcpkg\packages" -ErrorAction SilentlyContinue
+              }
+              # Clear vcpkg status files to reset internal registry
+              $vcpkgStatusFiles = @(
+                "C:\vcpkg\installed\vcpkg",
+                "C:\vcpkg\.vcpkg-root"
+              )
+              foreach ($statusFile in $vcpkgStatusFiles) {
+                if (Test-Path $statusFile) {
+                  Remove-Item -Recurse -Force $statusFile -ErrorAction SilentlyContinue
+                }
+              }
             }
           }
 
@@ -222,7 +270,40 @@ jobs:
             Write-Host "Last 50 lines of output:"
             $vcpkgOutput | Select-Object -Last 50 | Write-Host
             Write-Host ""
-            exit 1
+            
+            # Check if this is a cache corruption issue (packages marked as installed but files missing)
+            if ($vcpkgOutput -match "read_lines.*no such file or directory") {
+              Write-Host "Detected cache corruption issue. Performing full cleanup and retry..."
+              
+              # Full cleanup
+              $cleanupPaths = @(
+                "C:\vcpkg\installed",
+                "C:\vcpkg\packages",
+                "C:\vcpkg\buildtrees"
+              )
+              foreach ($path in $cleanupPaths) {
+                if (Test-Path $path) {
+                  Write-Host "Removing $path..."
+                  Remove-Item -Recurse -Force $path -ErrorAction SilentlyContinue
+                }
+              }
+              
+              Write-Host ""
+              Write-Host "Retrying vcpkg install after cleanup..."
+              & C:\vcpkg\vcpkg $vcpkgArgs 2>&1 | Tee-Object -Variable vcpkgOutput
+              $vcpkgExitCode = $LASTEXITCODE
+              
+              if ($vcpkgExitCode -ne 0) {
+                Write-Host "ERROR: vcpkg install failed again after cleanup"
+                Write-Host "Last 50 lines of output:"
+                $vcpkgOutput | Select-Object -Last 50 | Write-Host
+                exit 1
+              } else {
+                Write-Host "✓ vcpkg install succeeded after cleanup and retry"
+              }
+            } else {
+              exit 1
+            }
           }
 
           # Verify installed directory was created
@@ -482,4 +563,4 @@ jobs:
             rustdesk-windows-${{ github.run_number }}.zip
           draft: false
           prerelease: false
-# Windows Build Trigger - Sat Oct 25 03:55:08 PM +0330 2025
+# Windows Build Trigger - Enhanced vcpkg cache corruption fix with retry - Wed Oct 29 2025
