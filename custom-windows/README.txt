@@ -1,6 +1,18 @@
 ⚠️⚠️⚠️ WARNING: THIS .EXE FILE WILL NOT WORK ALONE! ⚠️⚠️⚠️
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    ❌ INCOMPLETE BUILD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 The rustdesk-windows.exe file in this folder is INCOMPLETE and cannot run.
+
+CURRENT STATUS:
+  Size: 23 MB (only 9% complete)
+  Missing: 227 MB of required files (91% missing!)
+  Can Execute: NO
+  
+WHEN YOU CLICK IT:
+  Result: NOTHING HAPPENS (program exits silently)
 
 WHY IT DOESN'T WORK:
 ====================
