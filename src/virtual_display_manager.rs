@@ -1,12 +1,12 @@
 use hbb_common::{bail, platform::windows::is_windows_version_or_greater, ResultType};
 
 // This string is defined here.
-//  https://github.com/rustdesk-org/RustDeskIddDriver/blob/b370aad3f50028b039aad211df60c8051c4a64d6/RustDeskIddDriver/RustDeskIddDriver.inf#LL73C1-L73C40
-pub const RUSTDESK_IDD_DEVICE_STRING: &'static str = "RustDeskIddDriver Device\0";
+//  https://github.com/windesk-org/WinDeskIddDriver/blob/b370aad3f50028b039aad211df60c8051c4a64d6/WinDeskIddDriver/WinDeskIddDriver.inf#LL73C1-L73C40
+pub const WINDESK_IDD_DEVICE_STRING: &'static str = "WinDeskIddDriver Device\0";
 pub const AMYUNI_IDD_DEVICE_STRING: &'static str = "USB Mobile Monitor Virtual Display\0";
 
 const IDD_IMPL: &str = IDD_IMPL_AMYUNI;
-const IDD_IMPL_RUSTDESK: &str = "rustdesk_idd";
+const IDD_IMPL_WINDESK: &str = "windesk_idd";
 const IDD_IMPL_AMYUNI: &str = "amyuni_idd";
 const IDD_PLUG_OUT_ALL_INDEX: i32 = -1;
 
@@ -16,7 +16,7 @@ pub fn is_amyuni_idd() -> bool {
 
 pub fn get_cur_device_string() -> &'static str {
     match IDD_IMPL {
-        IDD_IMPL_RUSTDESK => RUSTDESK_IDD_DEVICE_STRING,
+        IDD_IMPL_WINDESK => WINDESK_IDD_DEVICE_STRING,
         IDD_IMPL_AMYUNI => AMYUNI_IDD_DEVICE_STRING,
         _ => "",
     }
@@ -128,7 +128,7 @@ pub fn reset_all() -> ResultType<()> {
     }
 }
 
-pub mod rustdesk_idd {
+pub mod windesk_idd {
     use super::windows;
     use hbb_common::{allow_err, bail, lazy_static, log, ResultType};
     use std::{

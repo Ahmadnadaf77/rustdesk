@@ -377,8 +377,17 @@ jobs:
           ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ../src/flutter_ffi.rs --dart-output ./lib/generated_bridge.dart --c-output ./windows/runner/bridge_generated.h --skip-deps-check --no-build-runner
           flutter pub run build_runner build --delete-conflicting-outputs
 
-      # Build Rust backend and Flutter app in parallel
-      - name: Build Rust backend
+      # Build virtual display library first
+      - name: Build virtual display library
+        run: |
+          cd libs/virtual_display/dylib
+          $env:VCPKG_ROOT = "C:\vcpkg"
+          $env:VCPKG_DEFAULT_TRIPLET = "x64-windows-static"
+          cargo build --release
+          cd ../../..
+
+      # Build Rust backend library (not binary!)
+      - name: Build Rust backend library
         run: |
           # Set up Rust build environment for faster compilation
           $env:RUSTC_WRAPPER = ""
@@ -391,7 +400,23 @@ jobs:
           # Set additional environment variables for opus
           $env:OPUS_STATIC = "1"
           $env:OPUS_DIR = "C:\vcpkg\installed\x64-windows-static"
-          cargo build --release --jobs 2
+
+          # Build the library (--lib flag is critical!)
+          cargo build --features inline,flutter --lib --release --jobs 2
+
+          # Verify the DLL was created
+          if (-not (Test-Path "target/release/librustdesk.dll")) {
+            Write-Host "ERROR: librustdesk.dll was not created!"
+            exit 1
+          }
+          Write-Host "✓ librustdesk.dll created successfully"
+
+          # Verify virtual display DLL exists
+          if (-not (Test-Path "target/release/deps/dylib_virtual_display.dll")) {
+            Write-Host "ERROR: dylib_virtual_display.dll was not found!"
+            exit 1
+          }
+          Write-Host "✓ dylib_virtual_display.dll found"
         env:
           VCPKG_ROOT: C:\vcpkg
           VCPKG_DEFAULT_TRIPLET: x64-windows-static
@@ -403,6 +428,22 @@ jobs:
           cd flutter
           # Optimize Flutter build for faster compilation
           flutter build windows --release --verbose
+
+      - name: Copy required DLLs to Flutter build output
+        run: |
+          $buildDir = "flutter/build/windows/x64/runner/Release"
+
+          # Copy librustdesk.dll
+          Copy-Item "target/release/librustdesk.dll" -Destination $buildDir
+          Write-Host "✓ Copied librustdesk.dll"
+
+          # Copy virtual display DLL
+          Copy-Item "target/release/deps/dylib_virtual_display.dll" -Destination $buildDir
+          Write-Host "✓ Copied dylib_virtual_display.dll"
+
+          # List all DLLs in the build directory for verification
+          Write-Host "`nDLLs in build directory:"
+          Get-ChildItem $buildDir -Filter "*.dll" | ForEach-Object { Write-Host "  - $($_.Name)" }
 
       - name: Upload Windows build artifacts
         uses: actions/upload-artifact@v4
