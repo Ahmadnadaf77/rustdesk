@@ -24,9 +24,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `cd flutter && flutter test` - Run Flutter tests
 
 ### Platform-Specific Build Scripts
+- `build_windows_x64.ps1` - Windows x64 build script (PowerShell)
 - `flutter/build_android.sh` - Android build script
 - `flutter/build_ios.sh` - iOS build script
 - `flutter/build_fdroid.sh` - F-Droid build script
+
+### Windows Build Documentation
+- `QUICK_START.md` - Quick start guide for Windows builds
+- `BUILD_WINDOWS_GUIDE.md` - Comprehensive Windows build instructions
+- `WINDOWS_EXE_FIX.md` - Troubleshooting guide for Windows executable issues
+- `BUILD_WINDOWS.md` - Original Windows build instructions with custom server config
 
 ## Project Architecture
 

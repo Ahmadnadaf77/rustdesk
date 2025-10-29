@@ -8,10 +8,8 @@
   <b>We need your help to translate this README, <a href="https://github.com/rustdesk/rustdesk/tree/master/src/lang">RustDesk UI</a> and <a href="https://github.com/rustdesk/doc.rustdesk.com">RustDesk Doc</a> to your native language</b>
 </p>
 
-> [!Caution]
-> **Misuse Disclaimer:** <br>
+> [!Caution] > **Misuse Disclaimer:** <br>
 > The developers of RustDesk do not condone or support any unethical or illegal use of this software. Misuse, such as unauthorized access, control or invasion of privacy, is strictly against our guidelines. The authors are not responsible for any misuse of the application.
-
 
 Chat with us: [Discord](https://discord.gg/nDceKgxnkV) | [Twitter](https://twitter.com/rustdesk) | [Reddit](https://www.reddit.com/r/rustdesk) | [YouTube](https://www.youtube.com/@rustdesk)
 
@@ -58,6 +56,43 @@ Please download Sciter dynamic library yourself.
 - run `cargo run`
 
 ## [Build](https://rustdesk.com/docs/en/dev/build/)
+
+## How to Build on Windows
+
+**📖 Quick Start:** See [QUICK_START.md](QUICK_START.md) for the fastest way to get started.
+
+**📘 Comprehensive Guide:** See [BUILD_WINDOWS_GUIDE.md](BUILD_WINDOWS_GUIDE.md) for detailed Windows build instructions.
+
+**🔧 Troubleshooting:** See [WINDOWS_EXE_FIX.md](WINDOWS_EXE_FIX.md) if your executable doesn't work.
+
+**🚀 Automated Build:** Use the PowerShell script for a one-command build:
+
+```powershell
+.\build_windows_x64.ps1
+```
+
+### Prerequisites
+
+- Windows 10/11 x64
+- Visual Studio 2022 (with C++ development tools)
+- Rust toolchain from [rustup.rs](https://rustup.rs/)
+- Flutter SDK from [flutter.dev](https://flutter.dev/)
+- vcpkg (for C++ dependencies)
+
+### Quick Build
+
+```powershell
+# Build Rust library
+cargo build --features flutter --lib --release
+
+# Build Flutter Windows app
+cd flutter
+flutter build windows --release
+
+# Output: flutter\build\windows\x64\runner\Release\rustdesk.exe
+```
+
+**⚠️ Important:** The executable requires all DLLs and the `data/` folder from the Release directory to work!
 
 ## How to Build on Linux
 
@@ -179,4 +214,3 @@ Please ensure that you run these commands from the root of the RustDesk reposito
 ![File Transfer](https://github.com/rustdesk/rustdesk/assets/28412477/39511ad3-aa9a-4f8c-8947-1cce286a46ad)
 
 ![TCP Tunneling](https://github.com/rustdesk/rustdesk/assets/28412477/78e8708f-e87e-4570-8373-1360033ea6c5)
-
