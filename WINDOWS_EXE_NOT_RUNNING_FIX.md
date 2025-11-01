@@ -3,6 +3,7 @@
 ## Problem Description
 
 When you run `rustdesk.exe` on Windows, **nothing happens**:
+
 - No window appears
 - No error messages
 - No logs
@@ -12,6 +13,7 @@ When you run `rustdesk.exe` on Windows, **nothing happens**:
 ## Root Cause
 
 The executable is compiled as a **WIN32 GUI application** (not a console app), which means:
+
 1. Error messages written to `std::cout` are **invisible** - there's no console to display them
 2. If `librustdesk.dll` fails to load, the app exits silently with no feedback
 3. Users have no way to know what went wrong
@@ -25,6 +27,7 @@ This repository now includes **three levels of fixes**:
 **Changed:** Error messages now use `MessageBox` instead of `std::cout`
 
 **Before:**
+
 ```cpp
 if (!hInstance) {
   std::cout << "Failed to load librustdesk.dll." << std::endl;  // INVISIBLE!
@@ -33,6 +36,7 @@ if (!hInstance) {
 ```
 
 **After:**
+
 ```cpp
 if (!hInstance) {
   DWORD error = GetLastError();
@@ -50,8 +54,9 @@ if (!hInstance) {
 ```
 
 Now users will see a clear error dialog explaining:
+
 - What went wrong
-- Why it happened  
+- Why it happened
 - How to fix it
 
 ### 2. Build Verification (GitHub Actions Workflow)
@@ -74,14 +79,18 @@ The build will now **fail fast** if critical files are missing, rather than prod
 ### 3. User Diagnostic Tools
 
 #### A. Start RustDesk.bat (Launcher)
+
 Located in the distribution zip, provides:
+
 - File existence checks before launching
 - Clear error messages if files are missing
 - Capture exit codes and explain errors
 - Pause to show messages
 
 #### B. Troubleshoot.bat (Diagnostic Tool)
+
 Comprehensive diagnostic script that checks:
+
 - All required files and their sizes
 - DLL dependencies (if tools available)
 - System information
@@ -89,7 +98,9 @@ Comprehensive diagnostic script that checks:
 - Provides specific fix suggestions
 
 #### C. diagnose_windows_build.ps1 (Development Tool)
+
 For developers building from source:
+
 - Checks build directory structure
 - Verifies Rust library was built
 - Confirms files were copied correctly
@@ -105,8 +116,9 @@ For developers building from source:
 **Cause:** The core Rust library wasn't copied to the Flutter build output
 
 **Solution:**
+
 1. **For users:** Re-extract the entire zip file - don't move individual files
-2. **For developers:** 
+2. **For developers:**
    - Check `flutter/windows/CMakeLists.txt` line 104-108
    - Rebuild: `cd flutter && flutter build windows --release`
    - Verify: `dir flutter\build\windows\x64\runner\Release\librustdesk.dll`
@@ -115,12 +127,14 @@ For developers building from source:
 
 **Symptoms:** Error: "Failed to find 'rustdesk_core_main_args' function"
 
-**Cause:** 
+**Cause:**
+
 - Incomplete download
 - Version mismatch between exe and DLL
 - Antivirus corrupted the file
 
 **Solution:**
+
 1. Re-download the complete build
 2. Check file sizes match the build statistics
 3. Temporarily disable antivirus during extraction
@@ -133,6 +147,7 @@ For developers building from source:
 **Cause:** Windows Defender or other antivirus quarantining the executable
 
 **Solution:**
+
 1. Check Windows Security > Virus & threat protection > Protection history
 2. If blocked, add an exception for the RustDesk folder
 3. Right-click all .exe and .dll files > Properties > Unblock (if present)
@@ -145,6 +160,7 @@ For developers building from source:
 **Cause:** Missing `data` folder or `flutter_assets`
 
 **Solution:**
+
 1. Verify `data\icudtl.dat` exists
 2. Verify `data\flutter_assets\` folder exists
 3. Re-extract the complete zip file
@@ -162,6 +178,7 @@ For developers building from source:
 ### For Developers:
 
 1. **Run the diagnostic script:**
+
    ```powershell
    .\diagnose_windows_build.ps1
    ```
@@ -169,6 +186,7 @@ For developers building from source:
 2. **Check the output** for missing files
 
 3. **Common fixes:**
+
    - Rust library not built: `cargo build --release --features flutter`
    - Flutter build incomplete: `cd flutter && flutter build windows --release`
    - Files not copied: Check CMakeLists.txt configuration
@@ -185,18 +203,21 @@ For developers building from source:
 After applying the fixes, test with these scenarios:
 
 ### Test 1: Missing DLL
+
 1. Rename `librustdesk.dll` to `librustdesk.dll.bak`
 2. Run `rustdesk.exe`
 3. **Expected:** Error dialog appears explaining the DLL is missing
 4. **Before fix:** Nothing happened (silent failure)
 
-### Test 2: Corrupted DLL  
+### Test 2: Corrupted DLL
+
 1. Replace `librustdesk.dll` with a dummy file
 2. Run `rustdesk.exe`
 3. **Expected:** Error dialog about missing functions
 4. **Before fix:** Silent failure
 
 ### Test 3: Normal Operation
+
 1. Ensure all files are present
 2. Run `rustdesk.exe`
 3. **Expected:** Application starts normally
@@ -212,15 +233,15 @@ The GitHub Actions workflow now includes:
 
 ## Quick Reference
 
-| File | Purpose |
-|------|---------|
-| `rustdesk.exe` | Main executable (WIN32 GUI app) |
-| `librustdesk.dll` | **CRITICAL** - Core Rust functionality |
-| `flutter_windows.dll` | Flutter UI framework |
-| `data/icudtl.dat` | ICU internationalization data |
-| `data/flutter_assets/` | UI assets and resources |
-| `Start RustDesk.bat` | Launcher with diagnostics |
-| `Troubleshoot.bat` | Comprehensive diagnostic tool |
+| File                   | Purpose                                |
+| ---------------------- | -------------------------------------- |
+| `rustdesk.exe`         | Main executable (WIN32 GUI app)        |
+| `librustdesk.dll`      | **CRITICAL** - Core Rust functionality |
+| `flutter_windows.dll`  | Flutter UI framework                   |
+| `data/icudtl.dat`      | ICU internationalization data          |
+| `data/flutter_assets/` | UI assets and resources                |
+| `Start RustDesk.bat`   | Launcher with diagnostics              |
+| `Troubleshoot.bat`     | Comprehensive diagnostic tool          |
 
 ## For Future Builds
 
@@ -234,11 +255,12 @@ The GitHub Actions workflow now includes:
 - [ ] Verify error dialogs work by renaming a DLL
 
 ### Build Command:
+
 ```powershell
 # Build Rust backend
 cargo build --release --features flutter
 
-# Build Flutter app  
+# Build Flutter app
 cd flutter
 flutter build windows --release
 
@@ -267,9 +289,8 @@ If the exe still won't run after following this guide:
 
 ## Summary
 
-The core issue was **silent failures** due to WIN32 subsystem not showing `std::cout` messages. 
+The core issue was **silent failures** due to WIN32 subsystem not showing `std::cout` messages.
 
 **The fix:** Use `MessageBox` for error messages + comprehensive diagnostic tools.
 
 **Result:** Users now get clear, actionable error messages instead of silent failures.
-
