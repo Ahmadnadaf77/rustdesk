@@ -57,16 +57,16 @@ jobs:
           restore-keys: |
             vcpkg-exe-${{ runner.os }}-
 
-      # Flutter cache
-      - name: Cache Flutter
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.LOCALAPPDATA }}\Pub\Cache
-            flutter\.dart_tool
-          key: flutter-${{ runner.os }}-${{ hashFiles('flutter/pubspec.lock') }}
-          restore-keys: |
-            flutter-${{ runner.os }}-
+            # Flutter cache
+            - name: Cache Flutter
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~\AppData\Local\Pub\Cache
+                      flutter\.dart_tool
+                  key: flutter-${{ runner.os }}-${{ hashFiles('flutter/pubspec.lock') }}
+                  restore-keys: |
+                      flutter-${{ runner.os }}-
 
       # ============================================================
       # SETUP TOOLS - PARALLELIZED
