@@ -153,3 +153,4 @@ cd flutter\build\windows\x64\runner\Release
 2. **Crash on start**: Missing Visual C++ Redistributable
 3. **Missing dependencies**: Install vcpkg libraries
 4. **Build errors**: Ensure VCPKG_ROOT is set correctly
+

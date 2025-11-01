@@ -25,21 +25,49 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   HINSTANCE hInstance = LoadLibraryA("librustdesk.dll");
   if (!hInstance)
   {
-    std::cout << "Failed to load librustdesk.dll." << std::endl;
+    DWORD error = GetLastError();
+    wchar_t error_msg[512];
+    swprintf_s(error_msg, 512,
+               L"Failed to load librustdesk.dll\n\n"
+               L"Error Code: %lu\n\n"
+               L"Possible solutions:\n"
+               L"1. Ensure librustdesk.dll is in the same folder as rustdesk.exe\n"
+               L"2. Re-extract all files from the zip archive\n"
+               L"3. Check if antivirus is blocking the DLL\n"
+               L"4. Run Troubleshoot.bat for detailed diagnostics\n\n"
+               L"This is a critical file required for RustDesk to run.",
+               error);
+    MessageBoxW(nullptr, error_msg, L"RustDesk - Critical Error", MB_ICONERROR | MB_OK);
     return EXIT_FAILURE;
   }
   FUNC_RUSTDESK_CORE_MAIN rustdesk_core_main =
       (FUNC_RUSTDESK_CORE_MAIN)GetProcAddress(hInstance, "rustdesk_core_main_args");
   if (!rustdesk_core_main)
   {
-    std::cout << "Failed to get rustdesk_core_main." << std::endl;
+    MessageBoxW(nullptr,
+                L"Failed to find 'rustdesk_core_main_args' function in librustdesk.dll\n\n"
+                L"This usually means:\n"
+                L"1. The DLL is corrupted\n"
+                L"2. Version mismatch between exe and DLL\n"
+                L"3. Incomplete installation\n\n"
+                L"Please re-download and extract all files.",
+                L"RustDesk - Initialization Error",
+                MB_ICONERROR | MB_OK);
     return EXIT_FAILURE;
   }
   FUNC_RUSTDESK_FREE_ARGS free_c_args =
       (FUNC_RUSTDESK_FREE_ARGS)GetProcAddress(hInstance, "free_c_args");
   if (!free_c_args)
   {
-    std::cout << "Failed to get free_c_args." << std::endl;
+    MessageBoxW(nullptr,
+                L"Failed to find 'free_c_args' function in librustdesk.dll\n\n"
+                L"This usually means:\n"
+                L"1. The DLL is corrupted\n"
+                L"2. Version mismatch between exe and DLL\n"
+                L"3. Incomplete installation\n\n"
+                L"Please re-download and extract all files.",
+                L"RustDesk - Initialization Error",
+                MB_ICONERROR | MB_OK);
     return EXIT_FAILURE;
   }
   std::vector<std::string> command_line_arguments =
@@ -152,6 +180,20 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     window_title = app_name;
   }
   if (!window.CreateAndShow(window_title, origin, size, !is_cm_page)) {
+      MessageBoxW(nullptr,
+                  L"Failed to create and show the RustDesk window.\n\n"
+                  L"This could be caused by:\n"
+                  L"1. Missing or corrupted flutter_windows.dll\n"
+                  L"2. Missing data folder or assets\n"
+                  L"3. Insufficient system resources\n"
+                  L"4. Graphics driver issues\n\n"
+                  L"Please check:\n"
+                  L"- All files from the zip are extracted\n"
+                  L"- data/icudtl.dat exists\n"
+                  L"- data/flutter_assets folder exists\n"
+                  L"- Run Troubleshoot.bat for detailed diagnostics",
+                  L"RustDesk - Window Creation Failed",
+                  MB_ICONERROR | MB_OK);
       return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);

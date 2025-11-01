@@ -1,403 +1,591 @@
 name: Build Windows Release (Optimized)
 
 on:
-    push:
-        branches: [master, main]
-    pull_request:
-        branches: [master, main]
-    workflow_dispatch:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
 
 jobs:
-    build-windows:
-        runs-on: windows-latest
+  build-windows:
+    runs-on: windows-latest
 
-        # Increase available disk space and memory
+    # Increase available disk space and memory
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: 1
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 16 # Faster builds (was 1)
+      CARGO_PROFILE_RELEASE_LTO: thin # Faster than full LTO
+      RUSTC_WRAPPER: ""
+      VCPKG_ROOT: C:\vcpkg
+      VCPKG_DEFAULT_TRIPLET: x64-windows-static
+      VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # ============================================================
+      # OPTIMIZED CACHING STRATEGY
+      # ============================================================
+
+      # Binary caching for vcpkg - MAJOR SPEEDUP
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      # Aggressive Rust caching
+      - name: Cache Rust dependencies (Optimized)
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "windows-release-v2"
+          cache-on-failure: true
+          cache-all-crates: true
+
+      # vcpkg executable cache
+      - name: Cache vcpkg executable
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg
+          key: vcpkg-exe-${{ runner.os }}-${{ hashFiles('.git/modules/vcpkg/HEAD') }}
+          restore-keys: |
+            vcpkg-exe-${{ runner.os }}-
+
+      # Flutter cache
+      - name: Cache Flutter
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.LOCALAPPDATA }}\Pub\Cache
+            flutter\.dart_tool
+          key: flutter-${{ runner.os }}-${{ hashFiles('flutter/pubspec.lock') }}
+          restore-keys: |
+            flutter-${{ runner.os }}-
+
+      # ============================================================
+      # SETUP TOOLS - PARALLELIZED
+      # ============================================================
+
+      - name: Setup Rust (Stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.35.7"
+          channel: "stable"
+          cache: true
+
+      # ============================================================
+      # OPTIMIZED VCPKG SETUP WITH BINARY CACHING
+      # ============================================================
+
+      - name: Setup vcpkg (with binary caching)
+        run: |
+          # Setup vcpkg with minimal dependencies
+          if (-not (Test-Path "C:\vcpkg\.git")) {
+            Write-Host "Cloning vcpkg..."
+            git clone https://github.com/microsoft/vcpkg.git C:\vcpkg --depth 1
+          }
+
+          cd C:\vcpkg
+          git fetch origin --depth 1
+          git checkout 120deac3062162151622ca4860575a33844ba10b
+
+          # Bootstrap vcpkg
+          if (-not (Test-Path ".\vcpkg.exe")) {
+            .\bootstrap-vcpkg.bat -disableMetrics
+          }
+
+          Write-Host "vcpkg setup complete with binary caching enabled"
+
+      - name: Install vcpkg dependencies (Optimized with binary cache)
+        run: |
+          $ErrorActionPreference = "Stop"
+          $workspaceDir = $pwd.Path
+
+          Write-Host "=== OPTIMIZED VCPKG INSTALLATION WITH BINARY CACHING ==="
+          Write-Host "Binary cache enabled via VCPKG_BINARY_SOURCES"
+
+          cd C:\vcpkg
+
+          # Install with binary caching - downloads pre-built binaries instead of compiling
+          .\vcpkg install `
+            --triplet x64-windows-static `
+            --x-manifest-root="$workspaceDir" `
+            --x-install-root="C:\vcpkg\installed" `
+            --overlay-ports="$workspaceDir\res\vcpkg" `
+            --clean-after-build
+
+          # Integrate
+          .\vcpkg integrate install
+
+          Write-Host "✓ vcpkg installation complete (binary cache utilized)"
         env:
-            CARGO_TERM_COLOR: always
-            CARGO_INCREMENTAL: 1
-            CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 16 # Faster builds (was 1)
-            CARGO_PROFILE_RELEASE_LTO: thin # Faster than full LTO
-            RUSTC_WRAPPER: ""
-            VCPKG_ROOT: C:\vcpkg
-            VCPKG_DEFAULT_TRIPLET: x64-windows-static
-            VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
-
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
-              with:
-                  submodules: recursive
-
-            # ============================================================
-            # OPTIMIZED CACHING STRATEGY
-            # ============================================================
-
-            # Binary caching for vcpkg - MAJOR SPEEDUP
-            - name: Export GitHub Actions cache environment variables
-              uses: actions/github-script@v7
-              with:
-                  script: |
-                      core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-                      core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
-            # Aggressive Rust caching
-            - name: Cache Rust dependencies (Optimized)
-              uses: Swatinem/rust-cache@v2
-              with:
-                  shared-key: "windows-release-v2"
-                  cache-on-failure: true
-                  cache-all-crates: true
-
-            # vcpkg executable cache
-            - name: Cache vcpkg executable
-              uses: actions/cache@v4
-              with:
-                  path: C:\vcpkg
-                  key: vcpkg-exe-${{ runner.os }}-${{ hashFiles('.git/modules/vcpkg/HEAD') }}
-                  restore-keys: |
-                      vcpkg-exe-${{ runner.os }}-
-
-            # Flutter cache
-            - name: Cache Flutter
-              uses: actions/cache@v4
-              with:
-                  path: |
-                      ${{ env.LOCALAPPDATA }}\Pub\Cache
-                      flutter\.dart_tool
-                  key: flutter-${{ runner.os }}-${{ hashFiles('flutter/pubspec.lock') }}
-                  restore-keys: |
-                      flutter-${{ runner.os }}-
-
-            # ============================================================
-            # SETUP TOOLS - PARALLELIZED
-            # ============================================================
-
-            - name: Setup Rust (Stable)
-              uses: dtolnay/rust-toolchain@stable
-              with:
-                  targets: x86_64-pc-windows-msvc
-
-            - name: Setup Flutter
-              uses: subosito/flutter-action@v2
-              with:
-                  flutter-version: "3.35.7"
-                  channel: "stable"
-                  cache: true
-
-            # ============================================================
-            # OPTIMIZED VCPKG SETUP WITH BINARY CACHING
-            # ============================================================
-
-            - name: Setup vcpkg (with binary caching)
-              run: |
-                  # Setup vcpkg with minimal dependencies
-                  if (-not (Test-Path "C:\vcpkg\.git")) {
-                    Write-Host "Cloning vcpkg..."
-                    git clone https://github.com/microsoft/vcpkg.git C:\vcpkg --depth 1
-                  }
-
-                  cd C:\vcpkg
-                  git fetch origin --depth 1
-                  git checkout 120deac3062162151622ca4860575a33844ba10b
-
-                  # Bootstrap vcpkg
-                  if (-not (Test-Path ".\vcpkg.exe")) {
-                    .\bootstrap-vcpkg.bat -disableMetrics
-                  }
-
-                  Write-Host "vcpkg setup complete with binary caching enabled"
-
-            - name: Install vcpkg dependencies (Optimized with binary cache)
-              run: |
-                  $ErrorActionPreference = "Stop"
-                  $workspaceDir = $pwd.Path
-
-                  Write-Host "=== OPTIMIZED VCPKG INSTALLATION WITH BINARY CACHING ==="
-                  Write-Host "Binary cache enabled via VCPKG_BINARY_SOURCES"
-
-                  cd C:\vcpkg
-
-                  # Install with binary caching - downloads pre-built binaries instead of compiling
-                  .\vcpkg install `
-                    --triplet x64-windows-static `
-                    --x-manifest-root="$workspaceDir" `
-                    --x-install-root="C:\vcpkg\installed" `
-                    --overlay-ports="$workspaceDir\res\vcpkg" `
-                    --clean-after-build
-
-                  # Integrate
-                  .\vcpkg integrate install
-
-                  Write-Host "✓ vcpkg installation complete (binary cache utilized)"
-              env:
-                  VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
-
-            # ============================================================
-            # PARALLEL FLUTTER PREPARATION
-            # ============================================================
-
-            - name: Flutter dependencies and codegen (Parallel prep)
-              run: |
-                  cd flutter
-
-                  # Install dependencies
-                  flutter pub get
-                  flutter config --enable-windows-desktop
-
-                  # Install Flutter Rust Bridge if needed
-                  if (-not (Test-Path "$HOME\.cargo\bin\flutter_rust_bridge_codegen.exe")) {
-                    cargo install flutter_rust_bridge_codegen --version 1.80.1 --features "uuid" --locked
-                  }
-
-                  # Generate bridge code
-                  flutter_rust_bridge_codegen `
-                    --rust-input ..\src\flutter_ffi.rs `
-                    --dart-output .\lib\generated_bridge.dart `
-                    --c-output .\windows\runner\bridge_generated.h `
-                    --skip-deps-check --no-build-runner
-
-                  # Run build_runner
-                  flutter pub run build_runner build --delete-conflicting-outputs
-
-            # ============================================================
-            # OPTIMIZED RUST BUILD - FASTER COMPILATION
-            # ============================================================
-
-            - name: Build Rust backend (Optimized)
-              run: |
-                  Write-Host "=== OPTIMIZED RUST BUILD ==="
-                  Write-Host "Configuration:"
-                  Write-Host "  - LTO: thin (faster than full)"
-                  Write-Host "  - Codegen units: 16 (parallel compilation)"
-                  Write-Host "  - Jobs: 4 (utilize more cores)"
-                  Write-Host ""
-
-                  # Use optimal number of jobs for GitHub Actions (4 cores)
-                  cargo build --release --jobs 4 --features flutter
-
-                  Write-Host "✓ Rust build complete"
-              env:
-                  VCPKG_ROOT: C:\vcpkg
-                  VCPKG_DEFAULT_TRIPLET: x64-windows-static
-                  OPUS_STATIC: "1"
-                  OPUS_DIR: C:\vcpkg\installed\x64-windows-static
-                  # Override Cargo.toml profile settings for faster builds
-                  CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
-                  CARGO_PROFILE_RELEASE_LTO: "thin"
-
-            # ============================================================
-            # FLUTTER BUILD
-            # ============================================================
-
-            - name: Build Flutter Windows app (Optimized)
-              run: |
-                  cd flutter
-
-                  Write-Host "=== FLUTTER BUILD ==="
-                  # Build with optimizations
-                  flutter build windows --release --split-debug-info=./debug-info --obfuscate
-
-                  Write-Host "✓ Flutter build complete"
-
-            # ============================================================
-            # PACKAGING AND ARTIFACTS
-            # ============================================================
-
-            - name: Create Windows package
-              run: |
-                  $buildDir = "flutter\build\windows\x64\runner\Release"
-                  $installerDir = "rustdesk-windows-installer"
-
-                  Write-Host "Creating installer package..."
-                  New-Item -ItemType Directory -Path $installerDir -Force
-
-                  # Copy all required files
-                  Copy-Item -Path "$buildDir\*" -Destination $installerDir -Recurse -Force
-
-                  # Create launcher batch file
-                  @"
-                  @echo off
-                  cd /d "%~dp0"
-                  start rustdesk.exe
-                  "@ | Out-File -FilePath "$installerDir\Start RustDesk.bat" -Encoding ASCII
-
-                  # Create README
-                  @"
-                  RustDesk Windows Build (Optimized)
-                  ===================================
-
-                  Build Info:
-                  - Build Number: ${{ github.run_number }}
-                  - Commit: ${{ github.sha }}
-                  - Build Date: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-
-                  Custom Server Configuration:
-                  - ID Server: 171.22.24.28:21116
-                  - API Server: https://171.22.24.28
-                  - Public Key: 8HKCcJSQXbsgojo0gjrTg8uh7Kzfz+NS35lgIbWb0Vw=
-
-                  Installation:
-                  1. Extract this folder to any location
-                  2. Run rustdesk.exe or Start RustDesk.bat
-                  3. All required files must stay together
-
-                  Files Included:
-                  - rustdesk.exe (main application)
-                  - flutter_windows.dll (UI framework)
-                  - librustdesk.dll (core functionality)
-                  - data/ folder (assets and resources)
-
-                  System Requirements:
-                  - Windows 10 or later (64-bit)
-                  - No additional installations required
-                  "@ | Out-File -FilePath "$installerDir\README.txt" -Encoding UTF8
-
-                  # Create zip
-                  Compress-Archive -Path $installerDir -DestinationPath "rustdesk-windows-optimized-${{ github.run_number }}.zip" -Force
-
-                  Write-Host "✓ Package created successfully"
-
-            - name: Upload complete build
-              uses: actions/upload-artifact@v4
-              with:
-                  name: rustdesk-windows-optimized-build
-                  path: flutter/build/windows/x64/runner/Release/
-                  retention-days: 30
-                  compression-level: 6
-
-            - name: Upload installer package
-              uses: actions/upload-artifact@v4
-              with:
-                  name: rustdesk-windows-optimized-installer
-                  path: rustdesk-windows-optimized-${{ github.run_number }}.zip
-                  retention-days: 90
-                  compression-level: 0 # Already compressed
-
-            # ============================================================
-            # BUILD STATISTICS
-            # ============================================================
-
-            - name: Generate build statistics
-              run: |
-                  $buildDir = "flutter\build\windows\x64\runner\Release"
-
-                  Write-Host "`n=== BUILD STATISTICS ==="
-                  Write-Host "Build completed at: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-                  Write-Host ""
-
-                  Write-Host "Build Optimizations Applied:"
-                  Write-Host "  ✓ vcpkg binary caching (GitHub Actions cache)"
-                  Write-Host "  ✓ Aggressive Rust dependency caching"
-                  Write-Host "  ✓ Thin LTO instead of full LTO"
-                  Write-Host "  ✓ 16 codegen units for parallel compilation"
-                  Write-Host "  ✓ 4 parallel jobs for cargo build"
-                  Write-Host "  ✓ Flutter build cache"
-                  Write-Host ""
-
-                  Write-Host "File Sizes:"
-                  Get-ChildItem "$buildDir\*.exe","$buildDir\*.dll" -ErrorAction SilentlyContinue | 
-                    ForEach-Object { 
-                      Write-Host "  $($_.Name): $([math]::Round($_.Length / 1MB, 2)) MB" 
-                    }
-
-                  $totalSize = (Get-ChildItem -Path $buildDir -Recurse -File | 
-                    Measure-Object -Property Length -Sum).Sum / 1MB
-                  Write-Host ""
-                  Write-Host "Total package size: $([math]::Round($totalSize, 2)) MB"
-                  Write-Host ""
-
-                  # Save to file
-                  @"
-                  Build Statistics - Optimized Build
-                  ===================================
-
-                  Build Number: ${{ github.run_number }}
-                  Commit: ${{ github.sha }}
-                  Build Date: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-
-                  Optimizations Applied:
-                  - vcpkg binary caching enabled
-                  - Rust aggressive caching (rust-cache action)
-                  - Thin LTO (faster than full LTO)
-                  - 16 codegen units (parallel compilation)
-                  - 4 parallel cargo jobs
-                  - Flutter caching enabled
-
-                  Custom Server:
-                  - ID Server: 171.22.24.28:21116
-                  - API Server: https://171.22.24.28
-                  - Public Key: 8HKCcJSQXbsgojo0gjrTg8uh7Kzfz+NS35lgIbWb0Vw=
-
-                  Total Package Size: $([math]::Round($totalSize, 2)) MB
-
-                  Expected Performance:
-                  - First build: ~10-15 minutes (vs 20-25 minutes original)
-                  - Subsequent builds with cache: ~5-8 minutes (vs 15-20 minutes)
-                  - ~40-60% faster builds overall
-
-                  Cache Strategy:
-                  - vcpkg binaries cached (huge speedup on vcpkg)
-                  - Rust dependencies cached with rust-cache action
-                  - Flutter dependencies cached
-                  - All caches shared across workflow runs
-                  "@ | Out-File -FilePath "build_stats.txt" -Encoding UTF8
-
-            - name: Upload build stats
-              uses: actions/upload-artifact@v4
-              with:
-                  name: build-statistics
-                  path: build_stats.txt
-                  retention-days: 30
-
-            # ============================================================
-            # RELEASE (on tags)
-            # ============================================================
-
-            - name: Create GitHub Release (on tag)
-              if: startsWith(github.ref, 'refs/tags/')
-              uses: softprops/action-gh-release@v1
-              with:
-                  name: RustDesk Windows Release ${{ github.ref_name }} (Optimized Build)
-                  body: |
-                      ## RustDesk Windows Release ${{ github.ref_name }}
-
-                      ### 🚀 Optimized Build
-
-                      This is an **optimized build** with ~40-60% faster compile times:
-                      - vcpkg binary caching enabled
-                      - Thin LTO for faster linking
-                      - Parallel compilation with 16 codegen units
-                      - Aggressive dependency caching
-
-                      ### ✨ Features
-                      - Windows desktop application
-                      - Remote desktop functionality
-                      - File transfer capabilities
-                      - Audio/video streaming
-                      - Custom server pre-configured
-
-                      ### 📦 Installation
-                      1. Download `rustdesk-windows-optimized-installer` 
-                      2. Extract the zip file
-                      3. Run `rustdesk.exe` or `Start RustDesk.bat`
-
-                      ### 🔧 Custom Server
-                      Pre-configured with:
-                      - ID Server: 171.22.24.28:21116
-                      - API Server: https://171.22.24.28
-
-                      ### 💻 System Requirements
-                      - Windows 10 or later
-                      - 64-bit architecture
-
-                      ### 📊 Build Information
-                      - Build Number: ${{ github.run_number }}
-                      - Commit: ${{ github.sha }}
-                      - Build Type: Optimized (Faster compilation)
-                  files: |
-                      rustdesk-windows-optimized-${{ github.run_number }}.zip
-                  draft: false
-                  prerelease: false
+          VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
+
+      # ============================================================
+      # PARALLEL FLUTTER PREPARATION
+      # ============================================================
+
+      - name: Flutter dependencies and codegen (Parallel prep)
+        run: |
+          cd flutter
+
+          # Install dependencies
+          flutter pub get
+          flutter config --enable-windows-desktop
+
+          # Install Flutter Rust Bridge if needed
+          if (-not (Test-Path "$HOME\.cargo\bin\flutter_rust_bridge_codegen.exe")) {
+            cargo install flutter_rust_bridge_codegen --version 1.80.1 --features "uuid" --locked
+          }
+
+          # Generate bridge code
+          flutter_rust_bridge_codegen `
+            --rust-input ..\src\flutter_ffi.rs `
+            --dart-output .\lib\generated_bridge.dart `
+            --c-output .\windows\runner\bridge_generated.h `
+            --skip-deps-check --no-build-runner
+
+          # Run build_runner
+          flutter pub run build_runner build --delete-conflicting-outputs
+
+      # ============================================================
+      # OPTIMIZED RUST BUILD - FASTER COMPILATION
+      # ============================================================
+
+      - name: Build Rust backend (Optimized)
+        run: |
+          Write-Host "=== OPTIMIZED RUST BUILD ==="
+          Write-Host "Configuration:"
+          Write-Host "  - LTO: thin (faster than full)"
+          Write-Host "  - Codegen units: 16 (parallel compilation)"
+          Write-Host "  - Jobs: 4 (utilize more cores)"
+          Write-Host ""
+
+          # Use optimal number of jobs for GitHub Actions (4 cores)
+          cargo build --release --jobs 4 --features flutter
+
+          Write-Host "✓ Rust build complete"
+        env:
+          VCPKG_ROOT: C:\vcpkg
+          VCPKG_DEFAULT_TRIPLET: x64-windows-static
+          OPUS_STATIC: "1"
+          OPUS_DIR: C:\vcpkg\installed\x64-windows-static
+          # Override Cargo.toml profile settings for faster builds
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
+          CARGO_PROFILE_RELEASE_LTO: "thin"
+
+      # ============================================================
+      # FLUTTER BUILD
+      # ============================================================
+
+      - name: Build Flutter Windows app (Optimized)
+        run: |
+          cd flutter
+
+          Write-Host "=== FLUTTER BUILD ==="
+          # Build with optimizations
+          flutter build windows --release --split-debug-info=./debug-info --obfuscate
+
+          Write-Host "✓ Flutter build complete"
+
+          # Verify critical files exist
+          $buildDir = "build\windows\x64\runner\Release"
+          Write-Host "`nVerifying build output..."
+          $requiredFiles = @("rustdesk.exe", "flutter_windows.dll", "librustdesk.dll")
+          $missing = @()
+          foreach ($file in $requiredFiles) {
+            if (Test-Path "$buildDir\$file") {
+              $size = (Get-Item "$buildDir\$file").Length / 1MB
+              Write-Host "  ✓ $file ($([math]::Round($size, 2)) MB)"
+            } else {
+              Write-Host "  ✗ $file - MISSING!"
+              $missing += $file
+            }
+          }
+
+          if ($missing.Count -gt 0) {
+            Write-Host "`nERROR: Missing required files: $($missing -join ', ')" -ForegroundColor Red
+            exit 1
+          }
+
+          Write-Host "`n✓ All required files present"
+
+      # ============================================================
+      # PACKAGING AND ARTIFACTS
+      # ============================================================
+
+      - name: Create Windows package
+        run: |
+          $buildDir = "flutter\build\windows\x64\runner\Release"
+          $installerDir = "rustdesk-windows-installer"
+
+          Write-Host "Creating installer package..."
+          New-Item -ItemType Directory -Path $installerDir -Force
+
+          # Copy all required files
+          Copy-Item -Path "$buildDir\*" -Destination $installerDir -Recurse -Force
+
+          # Create diagnostic launcher batch file
+          @"
+          @echo off
+          echo RustDesk Windows Launcher
+          echo =========================
+          echo.
+          cd /d "%~dp0"
+
+          REM Check if required files exist
+          if not exist rustdesk.exe (
+              echo ERROR: rustdesk.exe not found!
+              pause
+              exit /b 1
+          )
+
+          if not exist librustdesk.dll (
+              echo ERROR: librustdesk.dll not found!
+              echo This is the core RustDesk library and is required.
+              pause
+              exit /b 1
+          )
+
+          if not exist flutter_windows.dll (
+              echo ERROR: flutter_windows.dll not found!
+              pause
+              exit /b 1
+          )
+
+          echo All required files found.
+          echo Starting RustDesk...
+          echo.
+          rustdesk.exe
+
+          if errorlevel 1 (
+              echo.
+              echo ERROR: RustDesk exited with error code %errorlevel%
+              echo.
+              echo Possible issues:
+              echo - Missing Visual C++ Redistributable
+              echo - Corrupted installation
+              echo - Antivirus blocking execution
+              echo.
+              pause
+          )
+          "@ | Out-File -FilePath "$installerDir\Start RustDesk.bat" -Encoding ASCII
+
+          # Create troubleshooting script
+          @"
+          @echo off
+          echo RustDesk Diagnostic Tool
+          echo ========================
+          echo.
+          cd /d "%~dp0"
+
+          echo Checking installation...
+          echo.
+
+          echo Files in current directory:
+          dir /b
+          echo.
+
+          echo Checking required files:
+          if exist rustdesk.exe (
+              echo [OK] rustdesk.exe found
+          ) else (
+              echo [FAIL] rustdesk.exe NOT FOUND
+          )
+
+          if exist librustdesk.dll (
+              echo [OK] librustdesk.dll found
+              
+              REM Try to check DLL dependencies
+              where dumpbin >nul 2>&1
+              if %errorlevel%==0 (
+                  echo.
+                  echo Checking librustdesk.dll dependencies:
+                  dumpbin /dependents librustdesk.dll
+              )
+          ) else (
+              echo [FAIL] librustdesk.dll NOT FOUND - THIS IS CRITICAL
+          )
+
+          if exist flutter_windows.dll (
+              echo [OK] flutter_windows.dll found
+          ) else (
+              echo [FAIL] flutter_windows.dll NOT FOUND
+          )
+
+          if exist data\flutter_assets (
+              echo [OK] Flutter assets found
+          ) else (
+              echo [FAIL] Flutter assets NOT FOUND
+          )
+
+          if exist data\icudtl.dat (
+              echo [OK] ICU data found
+          ) else (
+              echo [FAIL] ICU data NOT FOUND
+          )
+
+          echo.
+          echo System Information:
+          echo OS Version:
+          ver
+          echo.
+          echo Architecture:
+          wmic os get osarchitecture
+          echo.
+
+          echo Attempting to run rustdesk.exe with error capture...
+          echo.
+          rustdesk.exe --version 2>&1
+
+          if errorlevel 1 (
+              echo.
+              echo ERROR: Failed to execute rustdesk.exe
+              echo This usually means:
+              echo   1. Missing DLL dependencies
+              echo   2. Incompatible architecture (need 64-bit Windows)
+              echo   3. Antivirus/Windows Defender blocking
+              echo   4. Corrupted executable
+          )
+
+          echo.
+          echo Diagnostic complete.
+          pause
+          "@ | Out-File -FilePath "$installerDir\Troubleshoot.bat" -Encoding ASCII
+
+          # Create README
+          @"
+          RustDesk Windows Build (Optimized)
+          ===================================
+
+          Build Info:
+          - Build Number: ${{ github.run_number }}
+          - Commit: ${{ github.sha }}
+          - Build Date: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+
+          Custom Server Configuration:
+          - ID Server: 171.22.24.28:21116
+          - API Server: https://171.22.24.28
+          - Public Key: 8HKCcJSQXbsgojo0gjrTg8uh7Kzfz+NS35lgIbWb0Vw=
+
+          Installation:
+          1. Extract this folder to any location
+          2. Run "Start RustDesk.bat" (recommended) or rustdesk.exe
+          3. All required files must stay together in the same folder
+
+          Files Included:
+          - rustdesk.exe (main application)
+          - flutter_windows.dll (UI framework)
+          - librustdesk.dll (core RustDesk functionality - CRITICAL)
+          - data/ folder (assets and resources)
+          - Start RustDesk.bat (launcher with diagnostics)
+          - Troubleshoot.bat (diagnostic tool)
+
+          System Requirements:
+          - Windows 10 or later (64-bit only)
+          - No additional installations required (statically linked)
+
+          Troubleshooting:
+
+          If the application doesn't start:
+
+          1. Run "Troubleshoot.bat" to diagnose issues
+             - This will check for missing files
+             - Verify all dependencies are present
+             - Show detailed error messages
+
+          2. Check Windows Event Viewer:
+             - Open Event Viewer
+             - Go to Windows Logs > Application
+             - Look for errors related to RustDesk
+
+          3. Common issues:
+             - Missing librustdesk.dll: Re-extract the entire zip file
+             - Antivirus blocking: Add exception for rustdesk.exe
+             - Wrong architecture: Need 64-bit Windows
+             - Corrupted download: Re-download and verify file size
+
+          4. Enable detailed logging:
+             - Create a file named "RustDesk.toml" in the same folder
+             - Add: [options]
+                     log_level = "debug"
+             - Run rustdesk.exe
+             - Check for log files in the folder
+
+          5. Run from Command Prompt for error messages:
+             - Open Command Prompt
+             - Navigate to RustDesk folder
+             - Run: rustdesk.exe
+             - Any error messages will be visible
+
+          Known Issues:
+          - If nothing happens when double-clicking: librustdesk.dll is missing or corrupt
+          - Application crashes immediately: Check Windows Event Viewer for details
+          - Security warning: Right-click > Properties > Unblock for all files
+
+          Getting Help:
+          - Check the Troubleshoot.bat output
+          - Review logs in the application folder
+          - Contact support with build number ${{ github.run_number }}
+          "@ | Out-File -FilePath "$installerDir\README.txt" -Encoding UTF8
+
+          # Create zip
+          Compress-Archive -Path $installerDir -DestinationPath "rustdesk-windows-optimized-${{ github.run_number }}.zip" -Force
+
+          Write-Host "✓ Package created successfully"
+
+      - name: Upload complete build
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustdesk-windows-optimized-build
+          path: flutter/build/windows/x64/runner/Release/
+          retention-days: 30
+          compression-level: 6
+
+      - name: Upload installer package
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustdesk-windows-optimized-installer
+          path: rustdesk-windows-optimized-${{ github.run_number }}.zip
+          retention-days: 90
+          compression-level: 0 # Already compressed
+
+      # ============================================================
+      # BUILD STATISTICS
+      # ============================================================
+
+      - name: Generate build statistics
+        run: |
+          $buildDir = "flutter\build\windows\x64\runner\Release"
+
+          Write-Host "`n=== BUILD STATISTICS ==="
+          Write-Host "Build completed at: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+          Write-Host ""
+
+          Write-Host "Build Optimizations Applied:"
+          Write-Host "  ✓ vcpkg binary caching (GitHub Actions cache)"
+          Write-Host "  ✓ Aggressive Rust dependency caching"
+          Write-Host "  ✓ Thin LTO instead of full LTO"
+          Write-Host "  ✓ 16 codegen units for parallel compilation"
+          Write-Host "  ✓ 4 parallel jobs for cargo build"
+          Write-Host "  ✓ Flutter build cache"
+          Write-Host ""
+
+          Write-Host "File Sizes:"
+          Get-ChildItem "$buildDir\*.exe","$buildDir\*.dll" -ErrorAction SilentlyContinue | 
+            ForEach-Object { 
+              Write-Host "  $($_.Name): $([math]::Round($_.Length / 1MB, 2)) MB" 
+            }
+
+          $totalSize = (Get-ChildItem -Path $buildDir -Recurse -File | 
+            Measure-Object -Property Length -Sum).Sum / 1MB
+          Write-Host ""
+          Write-Host "Total package size: $([math]::Round($totalSize, 2)) MB"
+          Write-Host ""
+
+          # Save to file
+          @"
+          Build Statistics - Optimized Build
+          ===================================
+
+          Build Number: ${{ github.run_number }}
+          Commit: ${{ github.sha }}
+          Build Date: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+
+          Optimizations Applied:
+          - vcpkg binary caching enabled
+          - Rust aggressive caching (rust-cache action)
+          - Thin LTO (faster than full LTO)
+          - 16 codegen units (parallel compilation)
+          - 4 parallel cargo jobs
+          - Flutter caching enabled
+
+          Custom Server:
+          - ID Server: 171.22.24.28:21116
+          - API Server: https://171.22.24.28
+          - Public Key: 8HKCcJSQXbsgojo0gjrTg8uh7Kzfz+NS35lgIbWb0Vw=
+
+          Total Package Size: $([math]::Round($totalSize, 2)) MB
+
+          Expected Performance:
+          - First build: ~10-15 minutes (vs 20-25 minutes original)
+          - Subsequent builds with cache: ~5-8 minutes (vs 15-20 minutes)
+          - ~40-60% faster builds overall
+
+          Cache Strategy:
+          - vcpkg binaries cached (huge speedup on vcpkg)
+          - Rust dependencies cached with rust-cache action
+          - Flutter dependencies cached
+          - All caches shared across workflow runs
+          "@ | Out-File -FilePath "build_stats.txt" -Encoding UTF8
+
+      - name: Upload build stats
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-statistics
+          path: build_stats.txt
+          retention-days: 30
+
+      # ============================================================
+      # RELEASE (on tags)
+      # ============================================================
+
+      - name: Create GitHub Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          name: RustDesk Windows Release ${{ github.ref_name }} (Optimized Build)
+          body: |
+            ## RustDesk Windows Release ${{ github.ref_name }}
+
+            ### 🚀 Optimized Build
+
+            This is an **optimized build** with ~40-60% faster compile times:
+            - vcpkg binary caching enabled
+            - Thin LTO for faster linking
+            - Parallel compilation with 16 codegen units
+            - Aggressive dependency caching
+
+            ### ✨ Features
+            - Windows desktop application
+            - Remote desktop functionality
+            - File transfer capabilities
+            - Audio/video streaming
+            - Custom server pre-configured
+
+            ### 📦 Installation
+            1. Download `rustdesk-windows-optimized-installer` 
+            2. Extract the zip file
+            3. Run `rustdesk.exe` or `Start RustDesk.bat`
+
+            ### 🔧 Custom Server
+            Pre-configured with:
+            - ID Server: 171.22.24.28:21116
+            - API Server: https://171.22.24.28
+
+            ### 💻 System Requirements
+            - Windows 10 or later
+            - 64-bit architecture
+
+            ### 📊 Build Information
+            - Build Number: ${{ github.run_number }}
+            - Commit: ${{ github.sha }}
+            - Build Type: Optimized (Faster compilation)
+          files: |
+            rustdesk-windows-optimized-${{ github.run_number }}.zip
+          draft: false
+          prerelease: false
 # Optimized Build Workflow - Reduces build time by 40-60%
 # Key optimizations:
 # 1. vcpkg binary caching (GitHub Actions cache) - saves 5-8 minutes
